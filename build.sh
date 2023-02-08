@@ -22,7 +22,17 @@ if ! command -v docker > /dev/null; then
   exit 1
 fi
 
+if ! command -v curl > /dev/null; then
+  echo >&2 "curl must be installed to run build"
+  exit 1
+fi
+
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+
+if [ ! -d "${script_dir}/.gnupg" ]; then
+  echo >&2 "local gnupg directory not found at path: ${script_dir}/.gnupg"
+  exit 1
+fi
 
 arch=""
 case $(uname -m) in
@@ -69,6 +79,8 @@ lib_name="$(lib_name "$dockerfile")"
 
 # Enable docker build kit
 export DOCKER_BUILDKIT=1
+# Ensure permissions are set correctly for gpg data directory
+chmod 700 "${script_dir}/.gnupg"
 
 # Base images need to be processed differently because they are squashed and
 # they do not require downloading NGINX source code.
@@ -77,12 +89,19 @@ if echo "$dockerfile" | grep --quiet "base"; then
   docker tag "${arch}/${tag_name}-base:${os}-${lib_name}" "ghcr.io/nginxinc/${arch}/${tag_name}-base:${os}-${lib_name}"
   echo "${arch}/${tag_name}-base:${os}-${lib_name}" >> "${container_images}"
 else
+  if [ ! -f "${script_dir}/downloads/nginx-${version}.tar.gz.asc" ]; then
+    echo "Downloading http://nginx.org/download/nginx-${version}.tar.gz.asc -> ${script_dir}/downloads/nginx-${version}.tar.gz.asc"
+    curl --retry 6 --fail --show-error --silent --location --output "${script_dir}/downloads/nginx-${version}.tar.gz.asc" "http://nginx.org/download/nginx-${version}.tar.gz.asc"
+  fi
   if [ ! -f "${script_dir}/downloads/nginx-${version}.tar.gz" ]; then
     echo "Downloading http://nginx.org/download/nginx-${version}.tar.gz -> ${script_dir}/downloads/nginx-${version}.tar.gz"
     curl --retry 6 --fail --show-error --silent --location --output "${script_dir}/downloads/nginx-${version}.tar.gz" "http://nginx.org/download/nginx-${version}.tar.gz"
+    if ! gpg --homedir "${script_dir}/.gnupg" --verify "${script_dir}/downloads/nginx-${version}.tar.gz.asc" "${script_dir}/downloads/nginx-${version}.tar.gz"; then
+      echo >&2 "Could not verify integrity of NGINX archive: ${script_dir}/downloads/nginx-${version}.tar.gz"
+      exit 2
+    fi
   fi
 
-  grep "nginx-${version}.tar.gz" "${script_dir}/nginx_source_checksums.txt" | sha256sum --check --quiet
   docker build --file "${dockerfile}" --build-arg ARCH="${arch}" --build-arg NGX_VERSION="${version}" --tag "${arch}/${tag_name}:${os}-${lib_name}-nginx-${version}" "${script_dir}"
   echo "${arch}/${tag_name}:${os}-${lib_name}-nginx-${version}" >> "${container_images}"
 fi
