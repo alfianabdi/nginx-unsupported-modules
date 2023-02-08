@@ -3,11 +3,11 @@ FROM $ARCH/debian:bullseye-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV GRPC_VERSION_TAG=v1.36.4
-ENV OTEL_CPP_VERSION_TAG=v1.2.0
+ENV OTEL_CPP_VERSION_TAG=main
 
 RUN set -eux; \
-    apt-get update -qqq; \
-    apt-get install --no-install-recommends --no-install-suggests -qqq --yes \
+    apt-get update; \
+    apt-get install --no-install-recommends --no-install-suggests --yes \
       build-essential \
       autoconf \
       libtool \
@@ -28,7 +28,7 @@ RUN set -eux; \
     curl -o /etc/apt/trusted.gpg.d/kitware.asc https://apt.kitware.com/keys/kitware-archive-latest.asc; \
     apt-add-repository "deb https://apt.kitware.com/ubuntu/ focal main"; \
     apt-get update -qqq; \
-    apt-get install --no-install-recommends --no-install-suggests -qqq --yes cmake; \
+    apt-get install --no-install-recommends --no-install-suggests --yes cmake; \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
     rm -rf /var/lib/apt/lists/* /var/tmp/* /tmp/*
 
@@ -54,7 +54,7 @@ RUN set -eux; \
     rm -rf /build/grpc
 
 RUN set -eux; \
-    git clone --depth 1 --shallow-submodules --branch ${OTEL_CPP_VERSION_TAG} --recurse-submodules https://github.com/open-telemetry/opentelemetry-cpp /build/opentelemetry-cpp; \
+    git clone --depth 1 --shallow-submodules --branch ${OTEL_CPP_VERSION_TAG} --recurse-submodules https://github.com/alfianabdi/opentelemetry-cpp /build/opentelemetry-cpp; \
     mkdir /build/opentelemetry-cpp/build; \
     cd /build/opentelemetry-cpp/build; \
     cmake cmake \

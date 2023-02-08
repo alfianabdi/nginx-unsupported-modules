@@ -1,19 +1,20 @@
 ARG ARCH=amd64
-FROM ghcr.io/nginxinc/$ARCH/ngx_otel_module-base:linux-libc
+FROM ghcr.io/alfianabdi/ngx_otel_module:linux-libc-custom
 
 ARG NGX_VERSION
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NGINX_VERSION=$NGX_VERSION
 ENV OTEL_CPP_CONTRIB_VERSION_TAG=main
 
-RUN git clone --depth 1 --branch ${OTEL_CPP_CONTRIB_VERSION_TAG} https://github.com/open-telemetry/opentelemetry-cpp-contrib.git /build/opentelemetry-cpp-contrib; \
+RUN git clone --depth 1 --branch ${OTEL_CPP_CONTRIB_VERSION_TAG} https://github.com/alfianabdi/opentelemetry-cpp-contrib.git /build/opentelemetry-cpp-contrib; \
     cd /build/opentelemetry-cpp-contrib; \
     mkdir instrumentation/nginx/build
 
 WORKDIR /build/opentelemetry-cpp-contrib/instrumentation/nginx
 
 COPY downloads/nginx-$NGINX_VERSION.tar.gz /tmp/nginx.tar.gz
-COPY ngx_otel_module/nginx_version.patch .
+#COPY ngx_otel_module/nginx_version.patch .
+COPY nginx_version.patch .
 RUN patch < nginx_version.patch
 
 WORKDIR /build/opentelemetry-cpp-contrib/instrumentation/nginx/build
@@ -22,6 +23,8 @@ RUN set -eux; \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_PREFIX_PATH=/install \
       -DCMAKE_INSTALL_PREFIX=/nginx-modules \
+      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+      -DWITH_OTLP=ON \
       ..; \
     mkdir /nginx-modules; \
     make -j$(nproc); \
